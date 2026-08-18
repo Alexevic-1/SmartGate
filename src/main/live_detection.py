@@ -16,6 +16,7 @@ from json_config import JsonConfig
 
 import signal
 import sys
+import time
 
 def gstreamer_pipeline(
     capture_width=1280,
@@ -90,7 +91,16 @@ def main():
     object_list = []
 
     #Open the camera using GStreamer pipeline
-    cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
+    gst_str = (
+        "nvarguscamerasrc sensor-id=0 ! "
+        "video/x-raw(memory:NVMM), width=1280, height=720, "
+        "format=(string)NV12, framerate=(fraction)30/1 ! "
+        "nvvidconv flip-method=0 ! "
+        "video/x-raw, width=640, height=480, format=(string)BGRx ! "
+        "videoconvert ! "
+        "video/x-raw, format=(string)BGR ! appsink"
+    )
+    cap = cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
 
     #Our main loop
     while True:
@@ -118,7 +128,8 @@ def main():
             if io.get_val('PIR'):
                 current_state = State.DETECT
             else:
-                current_state = State.IDLE #Put back to IDLE state
+                current_state = State.IDLE
+                time.sleep(0.1) #Put back to IDLE state
 
         #------------DETECT State ----------------------------------------------------------
         elif current_state == State.DETECT:
