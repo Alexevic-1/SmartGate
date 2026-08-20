@@ -9,11 +9,6 @@ import time
 
 
 EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-host_inputs  = []
-cuda_inputs  = []
-host_outputs = []
-cuda_outputs = []
-bindings = []
 
 
 class YoloTRT():
@@ -57,23 +52,40 @@ class YoloTRT():
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(serialized_engine)
         self.context = self.engine.create_execution_context()
-        self.batch_size = self.engine.max_batch_size
 
-        for binding in self.engine:
-            size = trt.volume(self.engine.get_binding_shape(binding)) * self.batch_size
-            dtype = trt.nptype(self.engine.get_binding_dtype(binding))
+        #Explicit-batch engine built with batch size baked into the input shape (see EXPLICIT_BATCH above)
+        self.batch_size = 1
+
+        #Per-instance buffers (TensorRT 10 named-tensor API). These used to be module-level
+        #globals, which meant every YoloTRT instance shared (and clobbered) the same buffers -
+        #moved onto self so multiple instances/engines can coexist safely.
+        self.tensor_names = []
+        self.host_inputs   = []
+        self.cuda_inputs   = []
+        self.host_outputs  = []
+        self.cuda_outputs  = []
+
+        for i in range(self.engine.num_io_tensors):
+            name = self.engine.get_tensor_name(i)
+            self.tensor_names.append(name)
+
+            shape = self.engine.get_tensor_shape(name)
+            size = trt.volume(shape)
+            dtype = trt.nptype(self.engine.get_tensor_dtype(name))
             host_mem = cuda.pagelocked_empty(size, dtype)
             cuda_mem = cuda.mem_alloc(host_mem.nbytes)
 
-            bindings.append(int(cuda_mem))
-            if self.engine.binding_is_input(binding):
-                self.input_w = self.engine.get_binding_shape(binding)[-1]
-                self.input_h = self.engine.get_binding_shape(binding)[-2]
-                host_inputs.append(host_mem)
-                cuda_inputs.append(cuda_mem)
+            #Bind the device address now so it doesn't need to be re-set before every Inference() call
+            self.context.set_tensor_address(name, int(cuda_mem))
+
+            if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                self.input_w = shape[-1]
+                self.input_h = shape[-2]
+                self.host_inputs.append(host_mem)
+                self.cuda_inputs.append(cuda_mem)
             else:
-                host_outputs.append(host_mem)
-                cuda_outputs.append(cuda_mem)
+                self.host_outputs.append(host_mem)
+                self.cuda_outputs.append(cuda_mem)
 
     def PreProcessImg(self, img):
         image_raw = img
@@ -104,15 +116,15 @@ class YoloTRT():
 
     def Inference(self, img):
         input_image, image_raw, origin_h, origin_w = self.PreProcessImg(img)
-        np.copyto(host_inputs[0], input_image.ravel())
+        np.copyto(self.host_inputs[0], input_image.ravel())
         stream = cuda.Stream()
-        cuda.memcpy_htod_async(cuda_inputs[0], host_inputs[0], stream)
+        cuda.memcpy_htod_async(self.cuda_inputs[0], self.host_inputs[0], stream)
         t1 = time.time()
-        self.context.execute_async(self.batch_size, bindings, stream_handle=stream.handle)
-        cuda.memcpy_dtoh_async(host_outputs[0], cuda_outputs[0], stream)
+        self.context.execute_async_v3(stream_handle=stream.handle)
+        cuda.memcpy_dtoh_async(self.host_outputs[0], self.cuda_outputs[0], stream)
         stream.synchronize()
         t2 = time.time()
-        output = host_outputs[0]
+        output = self.host_outputs[0]
                 
         for i in range(self.batch_size):
             result_boxes, result_scores, result_classid = self.PostProcess(output, origin_h, origin_w)
@@ -241,4 +253,3 @@ class YoloTRT():
             c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
             cv2.rectangle(img, c1, c2, color, -1, cv2.LINE_AA)  # filled
             cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA,)
-        
