@@ -44,9 +44,7 @@ The [Configuration](#configuration) and [Usage](#usage) sections below apply to 
 once setup is complete `config/config.json`'s format is identical either way.
 
 <details>
-
-<summary><strong>Jetson Nano (JetPack 4.6)</strong></summary>
-
+<summary><strong>Jetson Orin Nano (JetPack 7.2)</strong></summary>
 #### Jetson Orin Nano (JetPack 7.2)
 
 The project runs entirely inside Docker on this target. There is no supported bare-metal install
@@ -325,6 +323,9 @@ python3 src/main/live_detection.py
 
 A web server should run in which the camera stream can be viewed from the main dashboard and dedicated controls to manually control the gate.
 
+<details>
+<summary><strong>Jetson Nano (JetPack 4.6)</strong></summary>
+
 #### Jetson Nano (JetPack 4.6)
 
 Installing the requirements should be ran under the Jetson Nano with the Jetpack SDK. For more info on setting this up, please refer to NVIDIA's official guides for your respective Jetson Nano model:
@@ -367,9 +368,6 @@ python3 live_detection.py
 `Note`: You may need to run this command with sudo privileges.
 
 </details>
-
-<details>
-<summary><strong>Jetson Orin Nano (JetPack 7.2)</strong></summary>
 
 ## Contact
 
