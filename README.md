@@ -45,6 +45,7 @@ once setup is complete `config/config.json`'s format is identical either way.
 
 <details>
 <summary><strong>Jetson Orin Nano (JetPack 7.2)</strong></summary>
+
 #### Jetson Orin Nano (JetPack 7.2)
 
 The project runs entirely inside Docker on this target. There is no supported bare-metal install
