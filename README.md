@@ -51,10 +51,10 @@ The project runs entirely inside Docker on this target. There is no supported ba
 path on the Orin Nano currently built. While the same project could be run bare-metal, docker is strongly reccommended for stability.
 
 * Base OS: JetPack 7.2 (L4T r39.2), flashed and booting.
-* Everything — PyTorch, TensorRT, OpenCV/GStreamer, `Jetson.GPIO`, and SmartGate itself — runs
+* Everything: PyTorch, TensorRT, OpenCV/GStreamer, `Jetson.GPIO`, and SmartGate itself runs
   inside a single Docker container built from the repo's `Dockerfile`.
 * GPIO and camera devices are passed into the container at runtime (`--device`), not baked in.
-* A small number of fixes are **host-only and intentionally not part of this repo** — see
+* A small number of fixes are **host-only and intentionally not part of this repo** see
   [Third-party carrier board notes](#third-party-carrier-board-notes-non-oem-hardware-only) below.
   On a proper OEM Jetson Orin Nano dev kit carrier board, none of that section applies and the
   container should work out of the box.
@@ -69,7 +69,7 @@ path on the Orin Nano currently built. While the same project could be run bare-
    [Troubleshooting](#troubleshooting).
 3. **Configure the CSI camera** via `sudo /opt/nvidia/jetson-io/jetson-io.py` →
    *Configure Jetson 22pin CSI Connector* → select the IMX219 overlay matching your physically
-   connected port (A/B/C — check your wiring, not just the first option), then reboot. Confirm
+   connected port (A/B/C check your wiring, not just the first option), then reboot. Confirm
    `/dev/video0` exists afterward (`ls /dev/video0`).
 4. If running on a **non-OEM/third-party carrier board**, apply the host-only fixes in
    [Third-party carrier board notes](#third-party-carrier-board-notes-non-oem-hardware-only)
@@ -108,7 +108,7 @@ This step converts the `.pt` weights to ONNX (via a cloned YOLOv5 v6.2, since th
 original model was trained/exported against) and then to a TensorRT engine (via `trtexec`). Because
 the container's toolchain (Python 3.12, torch 2.13, TensorRT 10.16) is much newer than what YOLOv5
 v6.2 was ever tested against, `convert_models.sh` handles a number of version-skew issues
-automatically — building the export dependencies into an isolated virtual environment to avoid
+automatically building the export dependencies into an isolated virtual environment to avoid
 clashing with the system's apt-managed packages, keeping `numpy` pinned below 2.x, patching around
 a `pkg_resources` removal in newer `setuptools`, and allowing `weights_only=False` for the
 `torch.load()` call so a torch 2.6+ security default doesn't block loading your own checkpoint. None
@@ -145,7 +145,7 @@ sudo ./setup/systemd_service_setup.sh
 ```
 
 This creates, enables, and starts `/etc/systemd/system/smartgate.service`. It does **not**
-include the carrier-board pinmux fix — that stays host-only and layers on top separately (see
+include the carrier-board pinmux fix that stays host-only and layers on top separately (see
 below) only if you're on non-OEM hardware.
 
 Confirmed working end-to-end, including a full `sudo reboot`:
@@ -158,7 +158,7 @@ Confirmed working end-to-end, including a full `sudo reboot`:
 * `ExecStop` (`docker stop`) sends `SIGTERM` straight into that process on any stop, restart, or
   system shutdown. `live_detection.py`'s signal handler catches both `SIGINT` and `SIGTERM` and
   runs `cleanup()` (`all_pins_off()` + `GPIO.cleanup()` + shutting down the web server) before
-  exiting — verified via `sudo systemctl restart smartgate` and a full `sudo reboot`, confirming no
+  exiting verified via `sudo systemctl restart smartgate` and a full `sudo reboot`, confirming no
   GPIO pin is left driven across a restart.
 
 Verify with `systemctl status smartgate`, `sudo docker ps`, and `journalctl -u smartgate -f`.
@@ -169,14 +169,14 @@ Verify with `systemctl status smartgate`, `sudo docker ps`, and `journalctl -u s
 is part of this git repository.** It exists only for development units using a third-party
 carrier board that isn't in `Jetson.GPIO`'s hardcoded list of recognized Jetson dev kit boards, and
 whose SoC pinmux defaults don't match the expected out-of-box configuration. On real OEM hardware,
-this entire section should be unnecessary — the repo and Dockerfile ship "as if brand new out of
+this entire section should be unnecessary the repo and Dockerfile ship "as if brand new out of
 the box."
 
 If you hit a `"Carrier board is not from a Jetson Developer Kit"` warning or GPIO pins reporting
 `"set to input in pinmux"` on non-OEM hardware, the fix is two host-level, unit-specific pieces
 that live outside git:
 
-* A pinmux fix script — direct SoC pinmux register writes (`busybox devmem ...`) forcing the
+* A pinmux fix script direct SoC pinmux register writes (`busybox devmem ...`) forcing the
   relevant pins into output mode at boot, wired in via a systemd `ExecStartPre` drop-in.
 * A one-line patch to the host's installed `Jetson.GPIO` library adding your carrier board's ID
   to the accepted list.
@@ -186,7 +186,7 @@ than copy-pasted blindly. Work through the diagnostic process (`GPIOtest.py`, ch
 warnings, matching the board ID reported at boot).
 
 Note: since the container drives GPIO via `-e JETSON_MODEL_NAME=JETSON_ORIN_NANO`, the
-carrier-board warning inside the container is cosmetic only — it fires once `GPIO.setmode()` runs
+carrier-board warning inside the container is cosmetic only it fires once `GPIO.setmode()` runs
 but doesn't block anything, because `JETSON_MODEL_NAME` bypasses the device-tree-based detection
 path entirely. The `Jetson.GPIO` library patch above is therefore only relevant for bare-metal/
 host-side GPIO testing outside the container. The pinmux register fix, on the other hand, still
@@ -199,7 +199,7 @@ independent of which process ends up driving the pin.
   container can't see `/proc/device-tree`. Pass `-e JETSON_MODEL_NAME=JETSON_ORIN_NANO` in
   `docker run` (already included in the `Makefile` and the boot systemd unit).
 * **`docker run --runtime nvidia` panics with a `cudacompat`/`nvidia-cdi-hook`: slice-bounds
-  error** — known bug in `nvidia-container-toolkit`'s CUDA forward-compatibility hook when
+  error** known bug in `nvidia-container-toolkit`'s CUDA forward-compatibility hook when
   running Jetson-targeted images. Not needed on Jetson anyway (container CUDA already matches the
   host driver). Fixed in the `Dockerfile` by removing
   `/usr/local/cuda-13.2/compat` and `/usr/local/cuda-13.2/compat_orin`.
@@ -215,13 +215,13 @@ independent of which process ends up driving the pin.
 * **I2C probe failure (`-121`/`EREMOTEIO`) configuring the CSI camera**: usually the wrong CSI
   port selected in `jetson-io.py`, not a bad camera. Double-check physical wiring against the
   port you selected. Generic `i2cdetect` scans are unreliable for Jetson CSI cameras (I2C mux
-  only routes on real camera-subsystem probes) — check `dmesg` output instead.
+  only routes on real camera-subsystem probes) check `dmesg` output instead.
 * **`OSError: [Errno 98] Address already in use` starting `live_detection.py` interactively**: 
   the `smartgate.service` systemd unit is already running and holding port 8080. See
   [Test interactively](#test-interactively) above.
 * **`FileNotFoundError` on `config.json` when running from the container/systemd**: the default
   config path must resolve relative to `json_config.py`'s own file location, not the process's
-  current working directory — otherwise it breaks as soon as the script is launched from anywhere
+  current working directory otherwise it breaks as soon as the script is launched from anywhere
   other than `src/main/` (exactly what both the container's `WORKDIR /app` and the systemd unit's
   `WorkingDirectory=/app` do).
 * **`convert_models.sh` fails on `pip install onnx` with `Cannot uninstall numpy ... RECORD file
@@ -277,7 +277,7 @@ Users are free to configure the rules to set the behaviour of the gate specified
 *Note that in the configuration file, any path specified can be relative to the location of the configuration file itself.*
 
 - The `model` section defines the settings for the object detection model
-    - `path` specifies the file path to the trained model (in this case, a YOLOv5 model in TensorRT format). If you are working with a `.pt` file, you will need to convert it to a `.engine` file — on the Jetson Nano, see the referenced [tutorial](https://youtube.com/watch?v=ErWC3nBuV6k) or the [JetsonYolov5](https://github.com/mailrocketsystems/JetsonYolov5) repo; on the Jetson Orin Nano, use `setup/convert_models.sh` as described in [Jetson Orin Nano (JetPack 7.2)](#jetson-orin-nano-jetpack-72).
+    - `path` specifies the file path to the trained model (in this case, a YOLOv5 model in TensorRT format). If you are working with a `.pt` file, you will need to convert it to a `.engine` file. On the Jetson Nano, see the referenced [tutorial](https://youtube.com/watch?v=ErWC3nBuV6k) or the [JetsonYolov5](https://github.com/mailrocketsystems/JetsonYolov5) repo; on the Jetson Orin Nano, use `setup/convert_models.sh` as described in [Jetson Orin Nano (JetPack 7.2)](#jetson-orin-nano-jetpack-72).
     - `classes` points to a text file containing the list of object classes the model can detect. It will need to be in the following format `index: class` (check the files in `models/classes` for some examples)
     - `confidence` sets the confidence threshold for object detection (`0.5` or 50% in this example).
 
@@ -302,7 +302,7 @@ Users are free to configure the rules to set the behaviour of the gate specified
 
 **Ensure [Supported Hardware](#supported-hardware) setup is complete before proceeding.**
 
-**Jetson Nano** — run directly on the host:
+**Jetson Nano** run directly on the host:
 
 ```sh
 cd SmartGate/src/main/
@@ -311,7 +311,7 @@ python3 live_detection.py
 
 `Note`: You may need to run this command with sudo privileges.
 
-**Jetson Orin Nano** — run inside the container (see
+**Jetson Orin Nano** run inside the container (see
 [Test interactively](#jetson-orin-nano-jetpack-72) for the full flow, or rely on the
 `smartgate.service` boot-time unit for production use):
 
