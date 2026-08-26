@@ -79,7 +79,7 @@ path on the Orin Nano currently built. While the same project could be run bare-
 ##### Build
 
 ```bash
-git clone https://github.com/TheOpenSI/SmartGate.git
+git clone https://github.com/Latzerni/SmartGate.git
 cd SmartGate
 sudo docker build -t smartgate:latest .
 ```
